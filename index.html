@@ -78,7 +78,7 @@ section{margin-bottom:28px}
 .tile .lbl{font-size:13.5px;color:var(--ink2);line-height:1.3;min-height:2.6em}
 .tile .row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
 .tile .val{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1}
-.tile .val small{font-size:15px;font-weight:500;color:var(--ink2);margin-left:3px}
+.tile .val small{font-size:15px;white-space:nowrap;font-weight:500;color:var(--ink2);margin-left:3px}
 .tile .delta{font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--muted)}
 .tile svg{display:block;width:100%;height:30px}
@@ -179,6 +179,7 @@ tfoot td{font-weight:650;border-top:1px solid var(--axis);border-bottom:0}
       <li>Рядом с каждой цифрой показано изменение к предыдущему периоду той же длины.</li>
       <li>Под каждой плиткой написано, из какого события берётся цифра. Это предложение для разработки, его можно поправить.</li>
       <li>«Среднее время подготовки ролика» считается от нажатия «Взять в работу» до загрузки готового ролика. Чем меньше, тем лучше, поэтому снижение окрашено зелёным.</li>
+      <li>«Активных экспертов на платформе» — сколько разных экспертов хотя бы раз зашли в свой ЛК за выбранный период. Один эксперт считается один раз, сколько бы раз он ни заходил.</li>
       <li>«Апрув с 1 раза» — доля единиц, которые согласовали без отправки на доработку.</li>
     </ul>
   </div>
@@ -219,6 +220,7 @@ for (let t = START.getTime(); t <= TODAY.getTime(); t += DAY) {
   EXPERTS.forEach((e, i) => {
     const act = .55 + (i % 3) * .2;
     if (wd === 1) EV.push([k, 'plans', 'pm', 1]);
+    if (rnd() < [.12, .45, .7, .2, .35, .55][i]) EV.push([k, 'login', e, 1]);
     EV.push([k, 'voice', e, pois(.8 * act)]);
     EV.push([k, 'video', e, pois(.6 * act)]);
     const fin = pois(.95 * act);
@@ -238,6 +240,8 @@ const M = [
   {id:'carousels', g:'team', label:'Каруселей с подгруженными картинками', src:'все слайды карусели получили картинку'},
   {id:'approved', g:'team', label:'Сценариев и текстов с апрувом SMM', src:'статус «Апрув SMM» у сценария или текста'},
   {id:'plans', g:'team', label:'Отправлено эксперту контент-планов «Темы»', src:'нажата «Отправить эксперту» (на запись голосовых)'},
+  {id:'active', g:'experts', label:'Активных экспертов на платформе', unit:`из ${EXPERTS.length}`, distinct:true, src:'эксперт хотя бы раз зашёл в свой ЛК за период'},
+  {id:'logins', g:'experts', hidden:true, label:'Дней со входом в ЛК', src:'дни, когда эксперт заходил в ЛК'},
   {id:'voice', g:'experts', label:'Слотов с записанными голосовыми', src:'в слот загружено голосовое эксперта'},
   {id:'video', g:'experts', label:'Слотов с подгруженными видео', src:'эксперт загрузил видео в слот'},
   {id:'final', g:'experts', label:'Согласовано экспертом (финальный этап)', src:'статус «Согласовано экспертом»'},
@@ -250,13 +254,16 @@ const M = [
 /* ---------- Агрегация ---------- */
 function agg(metric, from, to, who) {
   const a = key(from), b = key(to);
-  let s = 0, n = 0, s2 = 0;
+  let s = 0, n = 0, s2 = 0; const seen = new Set();
   for (const [k, m, w, v] of EV) {
     if (k < a || k > b || (who && w !== who)) continue;
+    if (metric === 'active') { if (m === 'login') seen.add(w); continue; }
+    if (metric === 'logins') { if (m === 'login') s += v; continue; }
     if (metric === 'first') { if (m === 'firstpass') s += v; if (m === 'final') s2 += v; continue; }
     if (m !== metric) continue;
     if (metric === 'prep') { s += v; n++; } else s += v;
   }
+  if (metric === 'active') return seen.size;
   if (metric === 'first') return s2 ? s / s2 * 100 : null;
   if (metric === 'prep') return n ? s / n : null;
   return s;
@@ -319,7 +326,7 @@ function render() {
   const wk = weeks(from, to);
   for (const g of ['team', 'experts']) {
     const box = document.getElementById(g === 'team' ? 'tilesTeam' : 'tilesExperts');
-    box.innerHTML = M.filter(m => m.g === g).map(m => {
+    box.innerHTML = M.filter(m => m.g === g && !m.hidden).map(m => {
       const cur = agg(m.id, from, to), prev = pFrom >= START ? agg(m.id, pFrom, pTo) : null;
       const sp = wk.filter(([a, b]) => Math.round((b - a) / DAY) >= 6).map(([a, b]) => agg(m.id, a, b));
       return `<button type="button" class="tile" data-m="${m.id}" aria-pressed="${m.id === sel}">
@@ -377,7 +384,7 @@ function tables() {
   h += '</tbody><tfoot><tr><td>Вся команда</td>' + cols.map(([id]) => `<td>${fmtV(mm(id), agg(id, from, to))}</td>`).join('') + '</tr></tfoot>';
   tblTeam.innerHTML = h;
 
-  const ec = [['voice','Голосовые'],['video','Видео'],['final','Согласовано'],['pubReels','Рилсы вышли'],['pubTg','TG вышли'],['pubCar','Карусели вышли'],['first','Апрув с 1 раза, %']];
+  const ec = [['logins','Дней со входом в ЛК'],['voice','Голосовые'],['video','Видео'],['final','Согласовано'],['pubReels','Рилсы вышли'],['pubTg','TG вышли'],['pubCar','Карусели вышли'],['first','Апрув с 1 раза, %']];
   let e = '<thead><tr><th>Эксперт</th>' + ec.map(c => `<th>${c[1]}</th>`).join('') + '</tr></thead><tbody>';
   for (const x of EXPERTS) e += `<tr><td>${x}</td>` + ec.map(([id]) => `<td>${fmtV(mm(id), agg(id, from, to, x))}</td>`).join('') + '</tr>';
   e += '</tbody><tfoot><tr><td>Все эксперты</td>' + ec.map(([id]) => `<td>${fmtV(mm(id), agg(id, from, to))}</td>`).join('') + '</tr></tfoot>';
