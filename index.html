@@ -82,6 +82,8 @@ section{margin-bottom:28px}
 .tile .delta{font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--muted)}
 .tile svg{display:block;width:100%;height:30px}
+.tile .split{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.tile .split b{color:var(--ink);font-weight:600}
 .tile .src{font-size:12px;color:var(--muted);line-height:1.35}
 
 .chartcard{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px}
@@ -93,13 +95,13 @@ section{margin-bottom:28px}
 .tip[hidden]{display:none}
 
 .tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
-table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
-th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 8px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
-thead th{font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em;background:var(--surface);position:sticky;top:0}
+thead th{font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em;background:var(--surface);position:sticky;top:0}
 tbody tr:hover{background:var(--hover)}
 tbody tr:last-child td{border-bottom:0}
-td .role{color:var(--muted);font-size:12.5px;margin-left:6px}
+td .role{display:block;color:var(--muted);font-size:11.5px}
 td.na{color:var(--muted)}
 tfoot td{font-weight:650;border-top:1px solid var(--axis);border-bottom:0}
 
@@ -180,7 +182,8 @@ tfoot td{font-weight:650;border-top:1px solid var(--axis);border-bottom:0}
       <li>Под каждой плиткой написано, из какого события берётся цифра. Это предложение для разработки, его можно поправить.</li>
       <li>«Среднее время подготовки ролика» считается от нажатия «Взять в работу» до загрузки готового ролика. Чем меньше, тем лучше, поэтому снижение окрашено зелёным.</li>
       <li>«Активных экспертов на платформе» — сколько разных экспертов хотя бы раз зашли в свой ЛК за выбранный период. Один эксперт считается один раз, сколько бы раз он ни заходил.</li>
-      <li>«Апрув с 1 раза» — доля единиц, которые согласовали без отправки на доработку.</li>
+      <li>«Сгенерировано …» — сколько сценариев рилсов, текстов каруселей и текстов постов система сгенерировала за период. Это работа системы, а не сотрудника, поэтому в таблице она идёт отдельной строкой «Система».</li>
+      <li>«Апрув с 1 раза» — доля единиц, которые согласовали без отправки на доработку. Под общей цифрой разбивка по рилсам, каруселям и постам; общая цифра считается по всем единицам вместе, а не как среднее трёх процентов.</li>
     </ul>
   </div>
 </main>
@@ -199,6 +202,7 @@ const TEAM = [
   {id:'rm1', name:'Рилсмейкер 1', role:'монтаж'},
   {id:'rm2', name:'Рилсмейкер 2', role:'монтаж'},
   {id:'smm', name:'SMM', role:'обложки, карусели, апрув'},
+  {id:'ai',  name:'Система', role:'генерация текстов'},
   {id:'pm',  name:'Продюсер', role:'контент-планы'},
 ];
 const EXPERTS = ['Эксперт 1','Эксперт 2','Эксперт 3','Эксперт 4','Эксперт 5','Эксперт 6'];
@@ -216,6 +220,9 @@ for (let t = START.getTime(); t <= TODAY.getTime(); t += DAY) {
     EV.push([k, 'covers', 'smm', pois(1.7 + progress)]);
     EV.push([k, 'carousels', 'smm', pois(.8 + progress * .6)]);
     EV.push([k, 'approved', 'smm', pois(2.6 + progress * 1.4)]);
+    EV.push([k, 'genScripts', 'ai', pois(2.4 + progress * 1.2)]);
+    EV.push([k, 'genCar', 'ai', pois(1.1 + progress * .6)]);
+    EV.push([k, 'genPosts', 'ai', pois(1.8 + progress * .8)]);
   }
   EXPERTS.forEach((e, i) => {
     const act = .55 + (i % 3) * .2;
@@ -223,9 +230,11 @@ for (let t = START.getTime(); t <= TODAY.getTime(); t += DAY) {
     if (rnd() < [.12, .45, .7, .2, .35, .55][i]) EV.push([k, 'login', e, 1]);
     EV.push([k, 'voice', e, pois(.8 * act)]);
     EV.push([k, 'video', e, pois(.6 * act)]);
-    const fin = pois(.95 * act);
-    const firstOk = Array.from({length: fin}, () => rnd() < .62 + progress * .15 + (i === 2 ? -.2 : 0)).filter(Boolean).length;
-    EV.push([k, 'final', e, fin], [k, 'firstpass', e, firstOk]);
+    for (const [t, rate, base] of [['R', .4, .58], ['C', .25, .7], ['P', .3, .76]]) {
+      const fin = pois(rate * act);
+      const ok = Array.from({length: fin}, () => rnd() < base + progress * .15 + (i === 2 ? -.2 : 0)).filter(Boolean).length;
+      EV.push([k, 'final', e, fin], [k, 'final' + t, e, fin], [k, 'firstpass' + t, e, ok]);
+    }
     EV.push([k, 'pubReels', e, pois(.42 * act)]);
     EV.push([k, 'pubTg', e, pois(.55 * act)]);
     EV.push([k, 'pubCar', e, pois(.28 * act)]);
@@ -239,6 +248,9 @@ const M = [
   {id:'covers', g:'team', label:'Подгружено обложек SMM', src:'событие: загружена обложка рилса'},
   {id:'carousels', g:'team', label:'Каруселей с подгруженными картинками', src:'все слайды карусели получили картинку'},
   {id:'approved', g:'team', label:'Сценариев и текстов с апрувом SMM', src:'статус «Апрув SMM» у сценария или текста'},
+  {id:'genScripts', g:'team', label:'Сгенерировано сценариев рилсов', src:'система сгенерировала сценарий для слота рилса'},
+  {id:'genCar', g:'team', label:'Сгенерировано текстов каруселей', src:'система сгенерировала текст карусели'},
+  {id:'genPosts', g:'team', label:'Сгенерировано текстов постов', src:'система сгенерировала текст поста'},
   {id:'plans', g:'team', label:'Отправлено эксперту контент-планов «Темы»', src:'нажата «Отправить эксперту» (на запись голосовых)'},
   {id:'active', g:'experts', label:'Активных экспертов на платформе', unit:`из ${EXPERTS.length}`, distinct:true, src:'эксперт хотя бы раз зашёл в свой ЛК за период'},
   {id:'logins', g:'experts', hidden:true, label:'Дней со входом в ЛК', src:'дни, когда эксперт заходил в ЛК'},
@@ -248,7 +260,10 @@ const M = [
   {id:'pubReels', g:'experts', label:'Вышло рилсов', src:'автопостинг: рилс опубликован'},
   {id:'pubTg', g:'experts', label:'Вышло постов Telegram', src:'автопостинг: пост опубликован'},
   {id:'pubCar', g:'experts', label:'Вышло каруселей', src:'автопостинг: карусель опубликована'},
-  {id:'first', g:'experts', label:'Апрув с 1 раза', unit:'%', pct:true, src:'доля согласованных без отправки на доработку'},
+  {id:'first', g:'experts', label:'Апрув с 1 раза', unit:'%', pct:true, split:[['firstR','Рилсы'],['firstC','Карусели'],['firstP','Посты']], src:'доля согласованных без отправки на доработку'},
+  {id:'firstR', g:'experts', hidden:true, label:'Апрув с 1 раза: рилсы', unit:'%', pct:true, src:''},
+  {id:'firstC', g:'experts', hidden:true, label:'Апрув с 1 раза: карусели', unit:'%', pct:true, src:''},
+  {id:'firstP', g:'experts', hidden:true, label:'Апрув с 1 раза: посты', unit:'%', pct:true, src:''},
 ];
 
 /* ---------- Агрегация ---------- */
@@ -259,11 +274,13 @@ function agg(metric, from, to, who) {
     if (k < a || k > b || (who && w !== who)) continue;
     if (metric === 'active') { if (m === 'login') seen.add(w); continue; }
     if (metric === 'logins') { if (m === 'login') s += v; continue; }
-    if (metric === 'first') { if (m === 'firstpass') s += v; if (m === 'final') s2 += v; continue; }
+    if (metric === 'first') { if (m.startsWith('firstpass')) s += v; if (m === 'final') s2 += v; continue; }
+    if (/^first[RCP]$/.test(metric)) { const t = metric.slice(5); if (m === 'firstpass' + t) s += v; if (m === 'final' + t) s2 += v; continue; }
     if (m !== metric) continue;
     if (metric === 'prep') { s += v; n++; } else s += v;
   }
   if (metric === 'active') return seen.size;
+  if (/^first[RCP]$/.test(metric)) return s2 ? s / s2 * 100 : null;
   if (metric === 'first') return s2 ? s / s2 * 100 : null;
   if (metric === 'prep') return n ? s / n : null;
   return s;
@@ -332,6 +349,7 @@ function render() {
       return `<button type="button" class="tile" data-m="${m.id}" aria-pressed="${m.id === sel}">
         <span class="lbl">${m.label}</span>
         <span class="row"><span class="val">${fmtV(m, cur)}${m.unit ? `<small>${m.unit}</small>` : ''}</span>${delta(m, cur, prev)}</span>
+        ${m.split ? `<span class="split">${m.split.map(([id, n]) => { const v = agg(id, from, to); return `<span>${n} <b>${v == null ? '—' : Math.round(v) + '%'}</b></span>`; }).join('')}</span>` : ''}
         ${spark(sp, css(g === 'team' ? '--team' : '--experts'))}
         <span class="src">${m.src}</span></button>`;
     }).join('');
@@ -368,7 +386,8 @@ function drawChart(wk) {
     const i = e.target.dataset && e.target.dataset.i; if (i == null) { tip.hidden = true; return; }
     const [a, b] = wk[i], cx = pl + bw * i + bw / 2;
     const part = Math.round((b - a) / DAY) < 6;
-    tip.innerHTML = `${fmtD(a)}–${fmtD(b)}${part ? ' (неполная неделя)' : ''}: <b>${fmtV(m, vals[i])}${m.unit ? ' ' + m.unit : ''}</b>`;
+    const br = m.split ? '<br>' + m.split.map(([id, n]) => { const v = agg(id, a, b); return n + ' ' + (v == null ? '—' : Math.round(v) + '%'); }).join(' · ') : '';
+    tip.innerHTML = `${fmtD(a)}–${fmtD(b)}${part ? ' (неполная неделя)' : ''}: <b>${fmtV(m, vals[i])}${m.unit ? ' ' + m.unit : ''}</b>${br}`;
     tip.style.left = (cx / W * chBox.clientWidth) + 'px'; tip.style.top = (y(vals[i] ?? 0) / H * 240) + 'px'; tip.hidden = false;
   };
   chart.onmouseleave = () => tip.hidden = true;
@@ -376,15 +395,15 @@ function drawChart(wk) {
 function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))), f = x / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
 
 function tables() {
-  const cols = [['reels','Ролики'],['prep','Ср. время, ч'],['covers','Обложки'],['carousels','Карусели'],['approved','Апрув SMM'],['plans','Планы «Темы»']];
-  const has = {rm1:['reels','prep'], rm2:['reels','prep'], smm:['covers','carousels','approved'], pm:['plans']};
+  const cols = [['reels','Ролики'],['prep','Ср. время, ч'],['covers','Обложки'],['carousels','Карусели'],['approved','Апрув SMM'],['genScripts','Сген. сценарии'],['genCar','Сген. карусели'],['genPosts','Сген. посты'],['plans','Планы «Темы»']];
+  const has = {rm1:['reels','prep'], rm2:['reels','prep'], smm:['covers','carousels','approved'], ai:['genScripts','genCar','genPosts'], pm:['plans']};
   const mm = id => M.find(x => x.id === id);
   let h = '<thead><tr><th>Сотрудник</th>' + cols.map(c => `<th>${c[1]}</th>`).join('') + '</tr></thead><tbody>';
   for (const p of TEAM) h += `<tr><td>${p.name}<span class="role">${p.role}</span></td>` + cols.map(([id]) => has[p.id].includes(id) ? `<td>${fmtV(mm(id), agg(id, from, to, p.id))}</td>` : '<td class="na">—</td>').join('') + '</tr>';
   h += '</tbody><tfoot><tr><td>Вся команда</td>' + cols.map(([id]) => `<td>${fmtV(mm(id), agg(id, from, to))}</td>`).join('') + '</tr></tfoot>';
   tblTeam.innerHTML = h;
 
-  const ec = [['logins','Дней со входом в ЛК'],['voice','Голосовые'],['video','Видео'],['final','Согласовано'],['pubReels','Рилсы вышли'],['pubTg','TG вышли'],['pubCar','Карусели вышли'],['first','Апрув с 1 раза, %']];
+  const ec = [['logins','Дней в ЛК'],['voice','Голосовые'],['video','Видео'],['final','Согласовано'],['pubReels','Вышло рилсов'],['pubTg','Вышло TG'],['pubCar','Вышло кар.'],['first','Апрув с 1 раза'],['firstR','рилсы'],['firstC','карусели'],['firstP','посты']];
   let e = '<thead><tr><th>Эксперт</th>' + ec.map(c => `<th>${c[1]}</th>`).join('') + '</tr></thead><tbody>';
   for (const x of EXPERTS) e += `<tr><td>${x}</td>` + ec.map(([id]) => `<td>${fmtV(mm(id), agg(id, from, to, x))}</td>`).join('') + '</tr>';
   e += '</tbody><tfoot><tr><td>Все эксперты</td>' + ec.map(([id]) => `<td>${fmtV(mm(id), agg(id, from, to))}</td>`).join('') + '</tr></tfoot>';
